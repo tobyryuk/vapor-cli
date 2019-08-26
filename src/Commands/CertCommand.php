@@ -2,6 +2,7 @@
 
 namespace Laravel\VaporCli\Commands;
 
+use Illuminate\Support\Str;
 use Laravel\VaporCli\Helpers;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Input\InputArgument;
@@ -17,9 +18,9 @@ class CertCommand extends Command
     {
         $this
             ->setName('cert')
-            ->addArgument('validation-method', InputArgument::REQUIRED, 'The certificate validation method (email, dns)')
+            // ->addArgument('validation-method', InputArgument::REQUIRED, 'The certificate validation method (email, dns)')
             ->addArgument('domain', InputArgument::REQUIRED, 'The domain name')
-            ->addOption('add', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'The additional domain names that should be added to the certificate', [])
+            // ->addOption('add', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'The additional domain names that should be added to the certificate', [])
             ->addOption('provider', null, InputOption::VALUE_OPTIONAL, 'The cloud provider ID')
             ->setDescription('Request a new SSL certificate');
     }
@@ -35,11 +36,14 @@ class CertCommand extends Command
 
         $domain = $this->argument('domain');
 
-        $additionalDomains = $this->option('add');
+        // $additionalDomains = $this->option('add');
+        $additionalDomains = [];
 
-        if (count(explode('.', $domain)) == 2) {
+        if (count(explode('.', $domain)) == 2 ||
+            (count(explode('.', $domain)) === 3 &&
+             Str::endsWith($domain, static::multiPartDomainEndings()))) {
             $additionalDomains = array_unique(
-                array_merge($additionalDomains, ['www.'.$domain])
+                array_merge($additionalDomains, ['*.'.$domain])
             );
         }
 
@@ -48,7 +52,8 @@ class CertCommand extends Command
             $domain,
             $additionalDomains,
             $this->determineRegion('Which region should the certificate be placed in?'),
-            $this->argument('validation-method')
+            'dns'
+            // $this->argument('validation-method')
         );
 
         Helpers::info('Certificate requested successfully for domains:');
@@ -58,8 +63,10 @@ class CertCommand extends Command
 
         Helpers::line();
 
-        if ($this->argument('validation-method') == 'dns') {
+        // if ($this->argument('validation-method') == 'dns') {
+        if (true) {
             Helpers::line('Vapor will automatically add the DNS validation records to your zone.');
+            Helpers::line('If you are using an outside DNS provider, you may retrieve the necessary CNAME records from the Vapor UI.');
         } else {
             Helpers::line('You will receive a domain verification email at the following email addresses:');
             Helpers::line();
@@ -96,5 +103,28 @@ class CertCommand extends Command
         foreach (['administrator', 'hostmaster', 'postmaster', 'webmaster', 'admin'] as $address) {
             Helpers::comment(' - '.$address.'@'.$domain);
         }
+    }
+
+    /**
+     * Get all of the valid multi-segment domain endings.
+     *
+     * @return array
+     */
+    protected static function multiPartDomainEndings()
+    {
+        return [
+            'co.nz',
+            'co.uk',
+            'co.za',
+            'com.ar',
+            'com.au',
+            'com.br',
+            'com.mx',
+            'com.sg',
+            'me.uk',
+            'org.br',
+            'org.nz',
+            'org.uk',
+        ];
     }
 }
